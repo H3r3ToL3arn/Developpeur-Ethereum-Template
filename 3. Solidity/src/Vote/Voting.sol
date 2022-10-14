@@ -3,29 +3,32 @@ pragma solidity ^0.8.17;
 
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
+// TO DO :
+// Maybe modify setVoteStatus (no choice, WorkflowStatus + 1 by default. This way, no modifier required)
+
 contract Voting is Ownable {
     struct Voter {
         bool isRegistered;
         bool hasVoted;
-        uint votedProposalId;
+        uint256 votedProposalId;
     }
     struct Proposal {
         string description;
-        uint voteCount;
+        uint256 voteCount;
     }
-    
-    struct EqualProposals { 
+
+    struct EqualProposals {
         string description;
-        uint id;
+        uint256 id;
     }
 
-    mapping(address => Voter) private _whitelist;
-    Proposal[] private proposals; 
+    mapping(address => Voter) private whitelist;
+    Proposal[] public proposals;
     EqualProposals[] private equalProposals;
-    uint private winningProposalId;
-    uint[] private equalProposalsIds;
+    uint256 private winningProposalId;
+    uint256[] private equalProposalsIds;
 
-    enum WorkflowStatus {               // Return uint
+    enum WorkflowStatus {               // Return uint                                      
         RegisteringVoters,              // 0
         ProposalsRegistrationStarted,   // 1
         ProposalsRegistrationEnded,     // 2
@@ -36,89 +39,120 @@ contract Voting is Ownable {
 
     WorkflowStatus public voteStatus;
 
+    event VoterRegistered(address voterAddress);
+    event WorkflowStatusChange(
+        WorkflowStatus previousStatus,
+        WorkflowStatus newStatus
+    );
+    event ProposalRegistered(uint256 proposalId);
+    event Voted(address voter, uint256 proposalId);
 
-    event VoterRegistered(address voterAddress); 
-    event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
-    event ProposalRegistered(uint proposalId);
-    event Voted (address voter, uint proposalId);
-
-    modifier onlyWhitelisted {
-        require(_whitelist[msg.sender].isRegistered, "This address is not whitelisted !");
+    modifier onlyWhitelisted() {
+        require(
+            whitelist[msg.sender].isRegistered,
+            "This address is not whitelisted !"
+        );
         _;
     }
 
+    modifier checkWorkflowOrder(WorkflowStatus _requestedStatus) {
+        require(
+            uint256(_requestedStatus) == uint256(voteStatus) + 1,
+            "Requested workflow status is not the one expected"
+        );
+        _;
+    }
+
+    modifier checkWorkflowStatusIs(WorkflowStatus _expectedStatus) {
+        require(_expectedStatus == voteStatus, "It's not the right time");
+        _;
+    }
 
     // Whitelist administration
 
-    function whitelist(address _address) public onlyOwner {
-        require(!_whitelist[_address].isRegistered, "This address is already whitelisted !");
-        require(uint(voteStatus) == 0, "Registering period is over");
-        _whitelist[_address].isRegistered = true;
+    function addWhitelist(address _address)
+        public
+        onlyOwner
+        checkWorkflowStatusIs(WorkflowStatus.RegisteringVoters)
+    {
+        require(
+            !whitelist[_address].isRegistered,
+            "This address is already whitelisted !"
+        );
+        whitelist[_address].isRegistered = true;
         emit VoterRegistered(_address);
     }
-    
-    function isWhitelisted(address _address) public view returns (bool){
-        return _whitelist[_address].isRegistered;
+
+    function isWhitelisted(address _address) public view returns (bool) {
+        return whitelist[_address].isRegistered;
     }
 
+    // Workflow status
 
-    // Admin / Workflow status 
-
-    function setVoteStatus(WorkflowStatus _status) public onlyOwner {
+    function setVoteStatus(WorkflowStatus _status)
+        public
+        onlyOwner
+        checkWorkflowOrder(_status)
+    {
         WorkflowStatus _previousStatus = voteStatus;
         voteStatus = _status;
-        emit WorkflowStatusChange(_previousStatus , _status);
+        emit WorkflowStatusChange(_previousStatus, _status);
     }
-
-    function getVoteStatus() public view returns(WorkflowStatus) {
-        return voteStatus;
-    }
-
-    function getWinner() public onlyOwner returns(uint) {
-    require(uint(voteStatus) == 5, "Voting period is not over");
-       for (uint i=0 ; i<proposals.length ; i++) {
-           if (proposals[i].voteCount > winningProposalId) {
-               winningProposalId = i;
-            }
-        }
-    return winningProposalId;
-    }
-
 
     // Proposal & Voting
 
-    function addProposal(string memory _description) public onlyWhitelisted {
-        require(uint(voteStatus) == 1, "Proposal period is over");
+    function addProposal(string memory _description)
+        public
+        onlyWhitelisted
+        checkWorkflowStatusIs(WorkflowStatus.ProposalsRegistrationStarted)
+    {
         proposals.push(Proposal(_description, 0));
         emit ProposalRegistered(proposals.length - 1);
     }
 
-    // function getProposal() public view returns(Proposal) {
-    // }
-
-    function voteForProposal(uint _proposalId) public onlyWhitelisted {
-        require(uint(voteStatus) == 3, "Voting period is over");
-        require(!_whitelist[msg.sender].hasVoted, "You have already voted");
-        _whitelist[msg.sender].hasVoted = true;
-        _whitelist[msg.sender].votedProposalId = _proposalId;
-        proposals[_proposalId].voteCount ++;
-        emit Voted (msg.sender, _proposalId);
+    function getProposalsDescriptions()
+        public
+        view
+        returns (Proposal[] memory)
+    {
+        return proposals;
     }
 
+    function voteForProposal(uint256 _proposalId)
+        public
+        onlyWhitelisted
+        checkWorkflowStatusIs(WorkflowStatus.VotingSessionStarted)
+    {
+        require(_proposalId < proposals.length, "Wrong proposal ID");
+        require(!whitelist[msg.sender].hasVoted, "You have already voted");
+        whitelist[msg.sender].hasVoted = true;
+        whitelist[msg.sender].votedProposalId = _proposalId;
+        proposals[_proposalId].voteCount++;
+        emit Voted(msg.sender, _proposalId);
+    }
 
+    // Voting results
+    function getWinner() internal returns (uint256) {
+        for (uint256 i = 0; i < proposals.length; i++) {
+            if (proposals[i].voteCount > winningProposalId) {
+                winningProposalId = i;
+            }
+        }
+        return winningProposalId;
+    }
 
-    // Voting results 
-    function showWinnnerDescription() public returns(string memory) {
+    function showWinnnerDescription()
+        public
+        checkWorkflowStatusIs(WorkflowStatus.VotesTallied)
+        returns (string memory)
+    {
         return proposals[getWinner()].description;
     }
 
-
-
     // Equality management
-    function getWinnerWithEquality() public onlyOwner returns(uint[] memory) {
-    require(uint(voteStatus) == 5, "Voting period is not over");
-    uint maxVoteCount;
-        for (uint i=0 ; i<proposals.length ; i++) {
+    function getWinnerWithEquality() internal returns (uint256[] memory) {
+        uint256 maxVoteCount;
+        for (uint256 i = 0; i < proposals.length; i++) {
             if (proposals[i].voteCount == maxVoteCount) {
                 equalProposalsIds.push(i);
             } else if (proposals[i].voteCount > maxVoteCount) {
@@ -127,16 +161,22 @@ contract Voting is Ownable {
                 equalProposalsIds.push(i);
             }
         }
-    return equalProposalsIds;
+        return equalProposalsIds;
     }
 
-
-    function showWinnersDescriptions(uint[] memory _equalProposalsIds) public returns(EqualProposals[] memory) {
-        for (uint i=0 ; i<_equalProposalsIds.length ; i++) {
-            equalProposals.push(EqualProposals(proposals[equalProposalsIds[i]].description, equalProposalsIds[i]));
+    function showWinnersDescriptions()
+        public
+        checkWorkflowStatusIs(WorkflowStatus.VotesTallied)
+        returns (EqualProposals[] memory)
+    {
+        for (uint256 i = 0; i < getWinnerWithEquality().length; i++) {
+            equalProposals.push(
+                EqualProposals(
+                    proposals[equalProposalsIds[i]].description,
+                    equalProposalsIds[i]
+                )
+            );
         }
-    return equalProposals;
+        return equalProposals;
     }
-
- 
 }

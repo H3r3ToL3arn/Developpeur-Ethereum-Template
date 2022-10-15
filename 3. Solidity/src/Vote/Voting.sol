@@ -16,7 +16,6 @@ contract Voting is Ownable {
 
     mapping(address => Voter) private whitelist;
     Proposal[] public proposals;
-    Proposal[] private equalProposals;
     uint256[] private winningProposalsIds;
 
     enum WorkflowStatus {               // Return uint

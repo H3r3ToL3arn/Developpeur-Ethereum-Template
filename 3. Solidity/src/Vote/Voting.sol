@@ -3,9 +3,6 @@ pragma solidity ^0.8.17;
 
 import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-// TO DO :
-// Maybe modify setVoteStatus (no choice, WorkflowStatus + 1 by default. This way, no modifier required)
-
 contract Voting is Ownable {
     struct Voter {
         bool isRegistered;

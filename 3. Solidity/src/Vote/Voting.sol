@@ -17,18 +17,12 @@ contract Voting is Ownable {
         uint256 voteCount;
     }
 
-    struct EqualProposals {
-        string description;
-        uint256 id;
-    }
-
     mapping(address => Voter) private whitelist;
     Proposal[] public proposals;
-    EqualProposals[] private equalProposals;
-    uint256 private winningProposalId;
-    uint256[] private equalProposalsIds;
+    Proposal[] private equalProposals;
+    uint256[] private winningProposalsIds;
 
-    enum WorkflowStatus {               // Return uint                                      
+    enum WorkflowStatus {               // Return uint
         RegisteringVoters,              // 0
         ProposalsRegistrationStarted,   // 1
         ProposalsRegistrationEnded,     // 2
@@ -55,23 +49,15 @@ contract Voting is Ownable {
         _;
     }
 
-    modifier checkWorkflowOrder(WorkflowStatus _requestedStatus) {
-        require(
-            uint256(_requestedStatus) == uint256(voteStatus) + 1,
-            "Requested workflow status is not the one expected"
-        );
-        _;
-    }
-
     modifier checkWorkflowStatusIs(WorkflowStatus _expectedStatus) {
         require(_expectedStatus == voteStatus, "It's not the right time");
         _;
     }
 
     // Whitelist administration
-
+    // Admin can whitelist user if registering session is in progress and the user is not already whitelisted
     function addWhitelist(address _address)
-        public
+        external
         onlyOwner
         checkWorkflowStatusIs(WorkflowStatus.RegisteringVoters)
     {
@@ -83,26 +69,24 @@ contract Voting is Ownable {
         emit VoterRegistered(_address);
     }
 
-    function isWhitelisted(address _address) public view returns (bool) {
+    // Everyone can verify if an address is whitelisted
+    function isWhitelisted(address _address) external view returns (bool) {
         return whitelist[_address].isRegistered;
     }
 
     // Workflow status
-
-    function setVoteStatus(WorkflowStatus _status)
-        public
-        onlyOwner
-        checkWorkflowOrder(_status)
-    {
+    // Admin can update the workflow status and go to the next status, until the last one
+    function goToNextStatus() external onlyOwner {
         WorkflowStatus _previousStatus = voteStatus;
-        voteStatus = _status;
-        emit WorkflowStatusChange(_previousStatus, _status);
+        voteStatus = WorkflowStatus(uint256(voteStatus) + 1);
+        require(uint256(voteStatus) < 6, "This voting session is over");
+        emit WorkflowStatusChange(_previousStatus, voteStatus);
     }
 
     // Proposal & Voting
-
-    function addProposal(string memory _description)
-        public
+    // Whitelisted users can add one or more proposals if the proposal session is in open
+    function addProposal(string calldata _description)
+        external
         onlyWhitelisted
         checkWorkflowStatusIs(WorkflowStatus.ProposalsRegistrationStarted)
     {
@@ -110,16 +94,18 @@ contract Voting is Ownable {
         emit ProposalRegistered(proposals.length - 1);
     }
 
+    // Return all the proposals with their description
     function getProposalsDescriptions()
-        public
+        external
         view
         returns (Proposal[] memory)
     {
         return proposals;
     }
 
+    // Whitelisted users can vote for a proposal if it exists, they have not already voted, and the voting session is open
     function voteForProposal(uint256 _proposalId)
-        public
+        external
         onlyWhitelisted
         checkWorkflowStatusIs(WorkflowStatus.VotingSessionStarted)
     {
@@ -131,52 +117,23 @@ contract Voting is Ownable {
         emit Voted(msg.sender, _proposalId);
     }
 
-    // Voting results
-    function getWinner() internal returns (uint256) {
-        for (uint256 i = 0; i < proposals.length; i++) {
-            if (proposals[i].voteCount > winningProposalId) {
-                winningProposalId = i;
-            }
-        }
-        return winningProposalId;
-    }
-
-    function showWinnnerDescription()
-        public
-        checkWorkflowStatusIs(WorkflowStatus.VotesTallied)
-        returns (string memory)
+    // Voting results with equality management
+    // Admin collect the IDs of the winners and their descriptions can be collected by the front via the events
+    function getWinnerWithEquality()
+        external
+        onlyOwner
+        returns (uint256[] memory)
     {
-        return proposals[getWinner()].description;
-    }
-
-    // Equality management
-    function getWinnerWithEquality() internal returns (uint256[] memory) {
         uint256 maxVoteCount;
         for (uint256 i = 0; i < proposals.length; i++) {
             if (proposals[i].voteCount == maxVoteCount) {
-                equalProposalsIds.push(i);
+                winningProposalsIds.push(i);
             } else if (proposals[i].voteCount > maxVoteCount) {
-                delete equalProposalsIds;
+                delete winningProposalsIds;
                 maxVoteCount = proposals[i].voteCount;
-                equalProposalsIds.push(i);
+                winningProposalsIds.push(i);
             }
         }
-        return equalProposalsIds;
-    }
-
-    function showWinnersDescriptions()
-        public
-        checkWorkflowStatusIs(WorkflowStatus.VotesTallied)
-        returns (EqualProposals[] memory)
-    {
-        for (uint256 i = 0; i < getWinnerWithEquality().length; i++) {
-            equalProposals.push(
-                EqualProposals(
-                    proposals[equalProposalsIds[i]].description,
-                    equalProposalsIds[i]
-                )
-            );
-        }
-        return equalProposals;
+        return winningProposalsIds;
     }
 }

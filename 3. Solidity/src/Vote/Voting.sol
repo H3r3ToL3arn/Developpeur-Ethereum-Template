@@ -74,9 +74,9 @@ contract Voting is Ownable {
     // Workflow status
     // Admin can update the workflow status and go to the next status, until the last one
     function goToNextStatus() external onlyOwner {
+        require(uint256(voteStatus) + 1 < 6, "This voting session is over");
         WorkflowStatus _previousStatus = voteStatus;
         voteStatus = WorkflowStatus(uint256(voteStatus) + 1);
-        require(uint256(voteStatus) < 6, "This voting session is over");
         emit WorkflowStatusChange(_previousStatus, voteStatus);
     }
 

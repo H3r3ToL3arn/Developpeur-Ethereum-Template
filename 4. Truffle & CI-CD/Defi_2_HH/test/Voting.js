@@ -9,7 +9,7 @@ const {
 
 
 describe("Main voting testing scope", function () {
-    let voting, owner, voter1, voter2, voter3;
+    let voting, owner, voter1, voter2, voter3, anon;
 
     before("Deploy the contract instance first", async function () {
 
@@ -19,7 +19,6 @@ describe("Main voting testing scope", function () {
 
         [owner, voter1, voter2, voter3, anon] =
             await ethers.getSigners();
-
     })
 
     it("Should set the ownner to the deployer of the contract", async function () {
@@ -28,60 +27,59 @@ describe("Main voting testing scope", function () {
 
     it("Should revert if anyone else than the owner try to start Proposal registering sessions", async function () {
         await expectRevert(
-            voting.connect(voter3).startProposalsRegistering(),
+            voting.connect(anon).startProposalsRegistering(),
             'Ownable: caller is not the owner',
         )
     })
 
     it("Should revert if anyone else than the owner try to end Proposal registering sessions", async function () {
         await expectRevert(
-            voting.connect(voter3).endProposalsRegistering(),
+            voting.connect(anon).endProposalsRegistering(),
             'Ownable: caller is not the owner',
         )
     })
 
     it("Should revert if anyone else than the owner try to start voting sessions", async function () {
         await expectRevert(
-            voting.connect(voter3).startVotingSession(),
+            voting.connect(anon).startVotingSession(),
             'Ownable: caller is not the owner',
         )
     })
 
-    it("Should revert if anyone else than the owner try to send voting sessions", async function () {
+    it("Should revert if anyone else than the owner try to end voting sessions", async function () {
         await expectRevert(
-            voting.connect(voter3).endVotingSession(),
+            voting.connect(anon).endVotingSession(),
             'Ownable: caller is not the owner',
         )
     })
 
     it("Should revert if anyone else than the owner try to tally votes", async function () {
         await expectRevert(
-            voting.connect(voter3).tallyVotes(),
+            voting.connect(anon).tallyVotes(),
             'Ownable: caller is not the owner',
         )
     })
 
     it("Should revert if an unregistered person try to get voter info", async function () {
         await expectRevert(
-            voting.connect(voter3).getVoter(voter3.address),
+            voting.connect(anon).getVoter(voter3.address),
             "You're not a voter",
         )
     })
 
     it("Should revert if an unregistered person try to get proposal info", async function () {
-        await expectRevert( 
-            voting.connect(voter3).getOneProposal(0),
+        await expectRevert(
+            voting.connect(anon).getOneProposal(0),
             "You're not a voter",
         )
     })
 
     it("Should revert if admin try to add Voter after Registration period", async function () {
         await voting.startProposalsRegistering()
-        await expectRevert( 
+        await expectRevert(
             voting.addVoter(voter3.address),
             'Voters registration is not open yet',
         )
-    
     })
 
 
@@ -237,7 +235,7 @@ describe("Main voting testing scope", function () {
 
         context("Vote test with right workflow status", function () {
             before("Set proposals, start the vote session", async function () {
-                  
+
                 await voting.startProposalsRegistering();
                 await voting.connect(voter1).addProposal('Voter1 proposal description 1');
                 await voting.connect(voter2).addProposal('Voter2 proposal description 1');
@@ -274,13 +272,13 @@ describe("Main voting testing scope", function () {
 
             it("Should not let user set a vote if he already did", async function () {
                 await expectRevert(voting.connect(voter1).setVote(1),
-                'You have already voted',
+                    'You have already voted',
                 )
             })
 
             it("Should not let user vote if ProposalID is unknown", async function () {
-                await expectRevert(voting.connect(voter2).setVote(1337), 
-                'Proposal not found',
+                await expectRevert(voting.connect(voter2).setVote(1337),
+                    'Proposal not found',
                 )
             })
 
@@ -288,7 +286,7 @@ describe("Main voting testing scope", function () {
                 const initialVoteCount = await voting.connect(voter1).getOneProposal(1)
                 await voting.connect(voter2).setVote(1)
                 const newVoteCount = await voting.connect(voter1).getOneProposal(1)
-                await expect(initialVoteCount.voteCount).to.equal(newVoteCount.voteCount -1)
+                await expect(initialVoteCount.voteCount).to.equal(newVoteCount.voteCount - 1)
             })
 
             it("Should emit a Voted event", async function () {
@@ -306,8 +304,9 @@ describe("Main voting testing scope", function () {
             })
         })
     })
-    
-    context("Ending session test",  function () {
+
+
+    context("Ending session test", function () {
         before("Deploy a new contract instance", async function () {
 
             const Voting = await ethers.getContractFactory("Voting");
@@ -328,6 +327,8 @@ describe("Main voting testing scope", function () {
                 'Current status is not voting session ended',
             )
         })
+
+
         context("Ending session test with right workflow status", function () {
             before("Set proposals and votes", async () => {
                 await voting.startProposalsRegistering();
@@ -339,14 +340,14 @@ describe("Main voting testing scope", function () {
                 await voting.connect(voter1).setVote(2);
                 await voting.connect(voter2).setVote(3);
                 await voting.connect(voter3).setVote(2);
-                await voting.endVotingSession();                               
+                await voting.endVotingSession();
             })
-            
+
             it("Should emit a WorkflowStatusChange event, VotesTallied", async function () {
                 await expect(voting.tallyVotes())
-                .to.emit(voting, 'WorkflowStatusChange',
-                { previousStatus: 4, newStatus: 5 }
-                )
+                    .to.emit(voting, 'WorkflowStatusChange',
+                        { previousStatus: 4, newStatus: 5 }
+                    )
             })
 
             it("Should return the right winning proposal ID", async function () {
@@ -354,12 +355,10 @@ describe("Main voting testing scope", function () {
                 await expect(winningProposalId).to.equal(2)
             })
         })
-
-
-
     })
-    
-    context("Workflow status test",  function () {
+
+
+    context("Workflow status test", function () {
         before("Deploy a new contract instance", async function () {
 
             const Voting = await ethers.getContractFactory("Voting");
@@ -367,14 +366,12 @@ describe("Main voting testing scope", function () {
             await voting.deployed();
 
             [owner] = await ethers.getSigners();
-
         })
 
         it("Should return WorkflowStatus RegisteringVoters", async () => {
             const status = await voting.workflowStatus.call()
             await expect(status).to.equal(0)
         })
-
 
         it("Should return WorkflowStatus ProposalsRegistrationStarted", async () => {
             await voting.startProposalsRegistering()
@@ -425,8 +422,5 @@ describe("Main voting testing scope", function () {
         it("Should revert if admin try TallyVotes when it's not the right WorkflowStatus", async function () {
             await expectRevert(voting.tallyVotes(), 'Current status is not voting session ended')
         })
-
-
-
     })
 })

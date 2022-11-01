@@ -116,7 +116,7 @@ describe("Main voting testing scope", function () {
 
         it("Should emit a VoterRegistered event when user is registered", async () => {
             await expect(voting.addVoter(voter2.address))
-                .to.emit(voting, 'VoterRegistered', { voterAddress: voter2.address });
+                .to.emit(voting, 'VoterRegistered').withArgs(voter2.address);
         })
     })
 
@@ -146,9 +146,7 @@ describe("Main voting testing scope", function () {
         context("Proposal test with right workflow status", function () {
             it("Should emit a WorkflowStatusChange event, ProposalRegistrationStarted", async function () {
                 await expect(voting.startProposalsRegistering())
-                    .to.emit(voting, 'WorkflowStatusChange',
-                        { previousStatus: 0, newStatus: 1 }
-                    );
+                    .to.emit(voting, 'WorkflowStatusChange').withArgs(0, 1);
             })
 
             it("Should revert if proposal is empty", async () => {
@@ -171,7 +169,7 @@ describe("Main voting testing scope", function () {
 
             it("Should emit ProposalRegistered event when adding a proposal", async () => {
                 await expect(voting.connect(voter1).addProposal('Voter1 proposal description'))
-                    .to.emit(voting, 'ProposalRegistered', { proposalID: 2 });
+                    .to.emit(voting, 'ProposalRegistered').withArgs(2);
             })
 
             it("Should let the same user store 10 proposal, get one by ID", async () => {
@@ -196,9 +194,7 @@ describe("Main voting testing scope", function () {
 
             it("Should emit a WorkflowStatusChange event, ProposalRegistrationEnded", async function () {
                 await expect(voting.endProposalsRegistering())
-                    .to.emit(voting, 'WorkflowStatusChange',
-                        { previousStatus: 1, newStatus: 2 }
-                    )
+                    .to.emit(voting, 'WorkflowStatusChange').withArgs(1, 2);
             })
 
             it("Should revert if proposal session is ended", async () => {
@@ -252,9 +248,7 @@ describe("Main voting testing scope", function () {
 
             it("Should emit a WorkflowStatusChange event, VotingSessionsStarted", async function () {
                 await expect(voting.startVotingSession())
-                    .to.emit(voting, 'WorkflowStatusChange',
-                        { previousStatus: 2, newStatus: 3 }
-                    )
+                    .to.emit(voting, 'WorkflowStatusChange').withArgs(2 , 3);
             })
 
             it("Should revert if voter isn't registered", async () => {
@@ -291,16 +285,12 @@ describe("Main voting testing scope", function () {
 
             it("Should emit a Voted event", async function () {
                 await expect(voting.connect(voter3).setVote(1))
-                    .to.emit(voting, 'Voted',
-                        { voter: voter3.address, proposalId: 1 }
-                    )
+                    .to.emit(voting, 'Voted').withArgs(voter3.address, 1);
             })
 
             it("Should emit a WorkflowStatusChange event, VotingSessionEnded", async function () {
                 await expect(voting.endVotingSession())
-                    .to.emit(voting, 'WorkflowStatusChange',
-                        { previousStatus: 3, newStatus: 4 }
-                    )
+                    .to.emit(voting, 'WorkflowStatusChange').withArgs(3, 4);
             })
         })
     })
@@ -345,9 +335,7 @@ describe("Main voting testing scope", function () {
 
             it("Should emit a WorkflowStatusChange event, VotesTallied", async function () {
                 await expect(voting.tallyVotes())
-                    .to.emit(voting, 'WorkflowStatusChange',
-                        { previousStatus: 4, newStatus: 5 }
-                    )
+                    .to.emit(voting, 'WorkflowStatusChange').withArgs(4, 5);
             })
 
             it("Should return the right winning proposal ID", async function () {

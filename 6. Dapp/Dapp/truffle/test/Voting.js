@@ -227,12 +227,6 @@ contract("Voting", function (accounts) {
             await Voting.setVote(1, { from: voter3 })
         })
 
-        it('Test on require: tally vote cant be done if not in the right worfkflow status', async function () {
-            await expectRevert(
-                Voting.getWinner({ from: owner }),
-                "Current status is not voting session ended")
-        })
-
         it('Tally pass, test on event on workflow status', async function () {
             await Voting.goToNextStatus({ from: owner })
             let receipt = await Voting.goToNextStatus({ from: owner });
@@ -240,7 +234,7 @@ contract("Voting", function (accounts) {
 
         })
 
-        it.only('Tally pass, test on winning proposal description and vote count', async function () {
+        it('Tally pass, test on winning proposal description and vote count', async function () {
             await Voting.goToNextStatus({ from: owner })
             await Voting.goToNextStatus({ from: owner });
             let winningID = await Voting.getWinner({ from: owner });

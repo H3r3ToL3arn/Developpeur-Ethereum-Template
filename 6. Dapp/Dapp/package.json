@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "toaster-js": "^2.2.3",
+    "toastr": "^2.1.4"
+  }
+}
